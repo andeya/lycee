@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["henrylee2cn <henrylee2cn@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
+description = "lycee is a key-value storage system being developed for me to learn rust"
 readme = "README.md"
 repository = "https://github.com/henrylee2cn/lycee"
 
