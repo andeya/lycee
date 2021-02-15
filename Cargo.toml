@@ -7,7 +7,17 @@ license = "Apache-2.0"
 description = "lycee is a key-value storage system being developed for me to learn rust"
 readme = "README.md"
 repository = "https://github.com/henrylee2cn/lycee"
+default-run = "lycee-server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+
+[[bin]]
+name = "lycee-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "lycee-scheduler"
+path = "src/bin/scheduler.rs"
