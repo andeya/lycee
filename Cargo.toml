@@ -11,9 +11,6 @@ default-run = "lycee-server"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-
-
 [[bin]]
 name = "lycee-server"
 path = "src/bin/server.rs"
@@ -21,3 +18,12 @@ path = "src/bin/server.rs"
 [[bin]]
 name = "lycee-scheduler"
 path = "src/bin/scheduler.rs"
+
+[dependencies]
+tonic = "0.4.0"
+bytes = "1.0.1"
+prost = "0.7.0"
+tokio = { version = "1.2.0", features = ["macros", "rt-multi-thread"] }
+
+[build-dependencies]
+tonic-build = "0.4.0"
