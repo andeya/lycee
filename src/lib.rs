@@ -41,3 +41,18 @@ pub mod proto {
         tonic::include_proto!("tinykvpb");
     }
 }
+
+
+pub fn catch_backtrace(skip: usize, max_depth: usize) -> backtrace::Backtrace {
+    let mut backtrace = backtrace::Backtrace::new_unresolved();
+    let frames = backtrace.frames();
+    const INIT_START: usize = 5;
+    let mut start = INIT_START + skip;
+    if start > frames.len() { start = frames.len() }
+    let mut end = start + max_depth;
+    if end > frames.len() { end = frames.len() }
+    backtrace = backtrace::Backtrace::from(frames[start..end].to_vec());
+    backtrace.resolve();
+    backtrace
+}
+

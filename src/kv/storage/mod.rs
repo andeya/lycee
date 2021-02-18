@@ -3,6 +3,8 @@ use std::error::Error;
 use modify::Modify;
 
 mod modify;
+// mod kvdb;
+// mod inner;
 
 /// Storage represents the internal-facing server part of TinyKV, it handles sending and receiving from other
 /// TinyKV nodes. As part of that responsibility, it also reads and writes data to disk (or semi-permanent memory).
@@ -15,7 +17,7 @@ trait Storage {
 
 trait StorageReader {
     fn get_cf(&self, cf: String, key: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>>;
-    fn iter_cf(&self, cf: String) -> Iterator<Item=DBItem>;
+    fn iter_cf(&self, cf: String) -> dyn Iterator<Item=dyn DBItem>;
     fn close(&self);
 }
 
