@@ -1,6 +1,6 @@
 use tonic::{Request, Response, Status, transport::Server};
 
-use lycee::catch_backtrace;
+use lycee::{catch_backtrace, innermost_symbol};
 use lycee::proto::helloworld::{HelloReply, HelloRequest};
 use lycee::proto::helloworld::greeter_server::{Greeter, GreeterServer};
 
@@ -15,11 +15,11 @@ impl Greeter for MyGreeter {
         request: Request<HelloRequest>,
     ) -> Result<Response<HelloReply>, Status> {
         println!("Got a request: {:?}", request);
-        println!("backtrace: {:?}", catch_backtrace(0, 100));
+        let b = catch_backtrace(0, 5);
+        println!("symbol:\n {}\nbacktrace:\n{:?}", innermost_symbol(&b), b);
         let reply = HelloReply {
             message: format!("Hello {}!", request.into_inner().name).into(),
         };
-
         Ok(Response::new(reply))
     }
 }
