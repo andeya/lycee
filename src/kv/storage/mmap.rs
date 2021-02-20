@@ -108,24 +108,32 @@ mod tests {
         println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.clone());
     }
 
-    fn get_helper() -> usize {
+    fn get_helper(pre: usize) -> usize {
         static INIT: Once = Once::new();
         static mut N: usize = 10;
         unsafe {
-            INIT.call_once(|| N = N + 1);
+            INIT.call_once(|| N = N + pre);
+            N
+        }
+    }
+
+    fn get_helper2(pre: usize) -> usize {
+        static mut N: usize = 10;
+        unsafe {
+            N = N + pre;
             N
         }
     }
 
     #[test]
     fn test_once() {
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
-        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper(1));
+        assert_eq!(11, get_helper(1));
+        assert_eq!(11, get_helper(1));
+        assert_eq!(11, get_helper(1));
+        assert_eq!(11, get_helper2(1));
+        assert_eq!(12, get_helper2(1));
+        assert_eq!(13, get_helper2(1));
+        assert_eq!(14, get_helper2(1));
     }
 }
