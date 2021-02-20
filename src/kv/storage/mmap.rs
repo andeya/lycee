@@ -18,7 +18,7 @@ impl CFile {
     pub fn c_read_raw<'a, T>(&mut self, page: usize) -> &'a T {
         c_read_raw(&mut self.0, page)
     }
-    pub fn c_write_raw<T>(&mut self, src: &T, page: usize) {
+    pub fn c_write_raw<T>(&mut self, page: usize, src: &T) {
         c_write_raw(src, &mut self.0, page)
     }
 }
@@ -96,7 +96,7 @@ mod tests {
             .expect("Unable to open file");
         let mut src = A { n: [0; 128] };
         src.n[0..4].copy_from_slice(&[2, 3, 4, 8]);
-        f.c_write_raw(&src, 0);
+        f.c_write_raw(0, &src);
         f.0.flush();
     }
 
