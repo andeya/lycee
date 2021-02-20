@@ -1,23 +1,24 @@
-use std::{
-    ffi::c_void,
-    fs::File,
-    io::{Seek, SeekFrom, Write},
-    mem,
-    os::unix::prelude::AsRawFd,
-    ptr,
-};
+use std::{io, mem};
+use std::ffi::c_void;
+use std::fs::{File, OpenOptions};
+use std::io::{Seek, SeekFrom, Write};
+use std::os::unix::prelude::AsRawFd;
+use std::path::Path;
+use std::ptr;
 
 use libc;
 
-pub fn c_read_raw<'a, T>(f: &mut File) -> &'a T {
-    transmute_ref(c_rw_file::<T>(f))
+
+
+pub fn c_read_raw<'a, T>(f: &mut File, offset: i64) -> &'a T {
+    transmute_ref(c_rw_file::<T>(f, offset))
 }
 
-pub fn c_write_raw<T>(src: &T, f: &mut File) {
-    copy_nonoverlapping(src, c_rw_file::<T>(f));
+pub fn c_write_raw<T>(src: &T, f: &mut File, offset: i64) {
+    copy_nonoverlapping(src, c_rw_file::<T>(f, offset));
 }
 
-fn c_rw_file<T>(f: &mut File) -> *mut c_void {
+fn c_rw_file<T>(f: &mut File, offset: i64) -> *mut c_void {
     let size = mem::size_of::<T>();
     // Allocate space in the file first
     f.seek(SeekFrom::Start(size as u64)).unwrap();
@@ -33,7 +34,7 @@ fn c_rw_file<T>(f: &mut File) -> *mut c_void {
             // Then make the mapping *public* so it is written back to the file
             /* flags: */ libc::MAP_SHARED,
             /* fd: */ f.as_raw_fd(),
-            /* offset: */ 0,
+            /* offset: */ offset,
         );
         if data == libc::MAP_FAILED {
             panic!("could not access data from memory mapped file")
@@ -42,6 +43,13 @@ fn c_rw_file<T>(f: &mut File) -> *mut c_void {
     }
 }
 
+fn open_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(path)
+}
 
 pub fn copy_nonoverlapping<S, D>(src: *const S, dst: *mut D) {
     unsafe { ptr::copy_nonoverlapping(src as *const u8, dst as *mut u8, std::mem::size_of::<S>()); }
@@ -58,7 +66,7 @@ mod tests {
     use std::io::Write;
     use std::mem;
 
-    use crate::kv::storage::mmap::{c_read_raw, c_write_raw};
+    use crate::kv::storage::mmap::{c_read_raw, c_write_raw, open_file};
 
     #[repr(C)]
     #[derive(Debug)]
@@ -68,28 +76,20 @@ mod tests {
 
     #[test]
     fn test_write() {
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open("test.mmap")
+        let mut f = open_file("test.mmap")
             .expect("Unable to open file");
         let mut src = A { n: [0; 128] };
         src.n[0..4].copy_from_slice(&[2, 3, 4, 8]);
-        c_write_raw(&src, &mut f);
+        c_write_raw(&src, &mut f, 0);
         f.flush();
     }
 
     #[test]
     fn test_read() {
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open("test.mmap")
+        let mut f = open_file("test.mmap")
             .expect("Unable to open file");
 
-        let src: &A = c_read_raw(&mut f);
+        let src: &A = c_read_raw(&mut f, 0);
         println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.clone());
     }
 }
