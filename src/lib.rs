@@ -1,6 +1,6 @@
 use std::ffi::c_void;
-use std::fmt::Display;
 use std::fmt;
+use std::fmt::Display;
 use std::path::Path;
 
 use backtrace::{Backtrace, BacktraceSymbol, SymbolName};

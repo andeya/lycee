@@ -8,18 +8,32 @@ use std::ptr;
 
 use libc;
 
+pub struct CFile(File);
 
 
-pub fn c_read_raw<'a, T>(f: &mut File, offset: i64) -> &'a T {
-    transmute_ref(c_rw_file::<T>(f, offset))
+impl CFile {
+    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<CFile> {
+        Ok(CFile(open_file(path)?))
+    }
+    pub fn c_read_raw<'a, T>(&mut self, page: usize) -> &'a T {
+        c_read_raw(&mut self.0, page)
+    }
+    pub fn c_write_raw<T>(&mut self, src: &T, page: usize) {
+        c_write_raw(src, &mut self.0, page)
+    }
 }
 
-pub fn c_write_raw<T>(src: &T, f: &mut File, offset: i64) {
-    copy_nonoverlapping(src, c_rw_file::<T>(f, offset));
+fn c_read_raw<'a, T>(f: &mut File, page: usize) -> &'a T {
+    transmute_ref(c_rw_file::<T>(f, page))
 }
 
-fn c_rw_file<T>(f: &mut File, offset: i64) -> *mut c_void {
-    let size = mem::size_of::<T>();
+fn c_write_raw<T>(src: &T, f: &mut File, page: usize) {
+    copy_nonoverlapping(src, c_rw_file::<T>(f, page));
+}
+
+fn c_rw_file<T>(f: &mut File, page: usize) -> *mut c_void {
+    let offset = page_size::get() * page;
+    let size = offset + mem::size_of::<T>();
     // Allocate space in the file first
     f.seek(SeekFrom::Start(size as u64)).unwrap();
     f.write_all(&[0]).unwrap();
@@ -34,7 +48,7 @@ fn c_rw_file<T>(f: &mut File, offset: i64) -> *mut c_void {
             // Then make the mapping *public* so it is written back to the file
             /* flags: */ libc::MAP_SHARED,
             /* fd: */ f.as_raw_fd(),
-            /* offset: */ offset,
+            /* offset: */ offset as i64,
         );
         if data == libc::MAP_FAILED {
             panic!("could not access data from memory mapped file")
@@ -42,6 +56,7 @@ fn c_rw_file<T>(f: &mut File, offset: i64) -> *mut c_void {
         data as *mut c_void
     }
 }
+
 
 fn open_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
     OpenOptions::new()
@@ -65,8 +80,9 @@ mod tests {
     use std::fs::OpenOptions;
     use std::io::Write;
     use std::mem;
+    use std::sync::Once;
 
-    use crate::kv::storage::mmap::{c_read_raw, c_write_raw, open_file};
+    use crate::kv::storage::mmap::{c_read_raw, c_write_raw, CFile, open_file};
 
     #[repr(C)]
     #[derive(Debug)]
@@ -76,20 +92,40 @@ mod tests {
 
     #[test]
     fn test_write() {
-        let mut f = open_file("test.mmap")
+        let mut f = CFile::open("test.mmap")
             .expect("Unable to open file");
         let mut src = A { n: [0; 128] };
         src.n[0..4].copy_from_slice(&[2, 3, 4, 8]);
-        c_write_raw(&src, &mut f, 0);
-        f.flush();
+        f.c_write_raw(&src, 0);
+        f.0.flush();
     }
 
     #[test]
     fn test_read() {
-        let mut f = open_file("test.mmap")
+        let mut f = CFile::open("test.mmap")
             .expect("Unable to open file");
-
-        let src: &A = c_read_raw(&mut f, 0);
+        let src: &A = f.c_read_raw(0);
         println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.clone());
+    }
+
+    fn get_helper() -> usize {
+        static INIT: Once = Once::new();
+        static mut N: usize = 10;
+        unsafe {
+            INIT.call_once(|| N = N + 1);
+            N
+        }
+    }
+
+    #[test]
+    fn test_once() {
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
+        assert_eq!(11, get_helper());
     }
 }
