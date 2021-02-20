@@ -90,6 +90,6 @@ mod tests {
             .expect("Unable to open file");
 
         let src: &A = c_read_raw(&mut f);
-        println!("读取结果 {}::=>{:?}", mem::size_of::<A>(), src);
+        println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.clone());
     }
 }
