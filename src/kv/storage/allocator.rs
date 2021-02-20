@@ -1,4 +1,5 @@
 use crate::kv::storage::inner::{busy_page_num_s, page_bitmap_s};
+use crate::kv::storage::kvdb::kvdb_s;
 
 type ckid_t = u32;
 //local page id
@@ -12,10 +13,20 @@ pub struct allocator_s {
     pb: Box<page_bitmap_s>,
 }
 
-// fn init_allocator(db: &mut kvdb_s) {
-//     let new = 0;
-//     let ck: ckid_t = 0;
-// }
+impl kvdb_s {
+    // fn init_allocator(&mut self) {
+    //     let new = 0;
+    //     let ck: ckid_t = 0;
+    //     let mut alc = allocator_s {
+    //         curr_ck: u32::MAX,
+    //         bpn
+    //         pb,
+    //     }
+    //     self.alc = Box::new(alc);
+    // }
+}
+
+
 //
 // void init_allocator(kvdb_t db)
 // {

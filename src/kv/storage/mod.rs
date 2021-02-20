@@ -8,6 +8,7 @@ pub mod inner;
 mod allocator;
 mod cache;
 mod crc64;
+mod mmap;
 
 /// Storage represents the internal-facing server part of TinyKV, it handles sending and receiving from other
 /// TinyKV nodes. As part of that responsibility, it also reads and writes data to disk (or semi-permanent memory).

@@ -16,3 +16,4 @@ Cargo.lock
 # Other
 
 /src/proto/out
+*.mmap
