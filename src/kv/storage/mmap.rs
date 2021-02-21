@@ -1,59 +1,48 @@
-use std::{io, mem};
-use std::ffi::c_void;
+use std::{io, ptr};
+use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
-use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
-use std::ptr;
 
-use libc;
+use mmapio::{AsMutT, AsRefT, Mmap, MmapOptions};
 
 pub struct CFile(File);
 
+#[derive(Debug)]
+pub struct RefT<'a, T> {
+    t: &'a T,
+    owner: Mmap,
+}
+
+impl<'a, T> AsRef<T> for RefT<'a, T> {
+    fn as_ref(&self) -> &'a T {
+        self.t
+    }
+}
 
 impl CFile {
     pub fn open<P: AsRef<Path>>(path: P) -> io::Result<CFile> {
         Ok(CFile(open_file(path)?))
     }
-    pub fn c_read_raw<'a, T>(&mut self, page: usize) -> &'a T {
-        c_read_raw(&mut self.0, page)
-    }
-    pub fn c_write_raw<T>(&mut self, page: usize, src: &T) {
-        c_write_raw(src, &mut self.0, page)
-    }
-}
 
-fn c_read_raw<'a, T>(f: &mut File, page: usize) -> &'a T {
-    transmute_ref(c_rw_file::<T>(f, page))
-}
-
-fn c_write_raw<T>(src: &T, f: &mut File, page: usize) {
-    copy_nonoverlapping(src, c_rw_file::<T>(f, page));
-}
-
-fn c_rw_file<T>(f: &mut File, page: usize) -> *mut c_void {
-    let offset = page_size::get() * page;
-    let size = offset + mem::size_of::<T>();
-    // Allocate space in the file first
-    f.seek(SeekFrom::Start(size as u64)).unwrap();
-    f.write_all(&[0]).unwrap();
-    f.seek(SeekFrom::Start(0)).unwrap();
-    // This refers to the `File` but doesn't use lifetimes to indicate
-    // that. This is very dangerous, and you need to be careful.
-    unsafe {
-        let data = libc::mmap(
-            /* addr: */ ptr::null_mut(),
-            /* len: */ size,
-            /* prot: */ libc::PROT_READ | libc::PROT_WRITE,
-            // Then make the mapping *public* so it is written back to the file
-            /* flags: */ libc::MAP_SHARED,
-            /* fd: */ f.as_raw_fd(),
-            /* offset: */ offset as i64,
-        );
-        if data == libc::MAP_FAILED {
-            panic!("could not access data from memory mapped file")
+    pub fn c_write_raw<T>(&self, offset: u64, src: &T) -> io::Result<()> {
+        unsafe {
+            let mut mmap = MmapOptions::new()
+                .len(std::mem::size_of::<T>())
+                .offset(offset)
+                .map_mut(&self.0)?;
+            mmap.write_t(src);
         }
-        data as *mut c_void
+        Ok(())
+    }
+
+    pub fn c_read_raw<'a, T: Debug>(&self, offset: u64) -> io::Result<RefT<'a, T>> {
+        unsafe {
+            let mmap = MmapOptions::new()
+                .len(std::mem::size_of::<T>())
+                .offset(offset)
+                .map(&self.0)?;
+            Ok(RefT { t: mmap.as_ref_t::<'a, T>(), owner: mmap })
+        }
     }
 }
 
@@ -82,7 +71,7 @@ mod tests {
     use std::mem;
     use std::sync::Once;
 
-    use crate::kv::storage::mmap::{c_read_raw, c_write_raw, CFile, open_file};
+    use crate::kv::storage::mmap::{CFile, RefT};
 
     #[repr(C)]
     #[derive(Debug)]
@@ -96,44 +85,15 @@ mod tests {
             .expect("Unable to open file");
         let mut src = A { n: [0; 128] };
         src.n[0..4].copy_from_slice(&[2, 3, 4, 8]);
-        f.c_write_raw(0, &src);
+        f.c_write_raw(0, &src).expect("c_write_raw");
         f.0.flush();
     }
 
     #[test]
     fn test_read() {
-        let mut f = CFile::open("test.mmap")
+        let f = CFile::open("test.mmap")
             .expect("Unable to open file");
-        let src: &A = f.c_read_raw(0);
-        println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.clone());
-    }
-
-    fn get_helper(pre: usize) -> usize {
-        static INIT: Once = Once::new();
-        static mut N: usize = 10;
-        unsafe {
-            INIT.call_once(|| N = N + pre);
-            N
-        }
-    }
-
-    fn get_helper2(pre: usize) -> usize {
-        static mut N: usize = 10;
-        unsafe {
-            N = N + pre;
-            N
-        }
-    }
-
-    #[test]
-    fn test_once() {
-        assert_eq!(11, get_helper(1));
-        assert_eq!(11, get_helper(1));
-        assert_eq!(11, get_helper(1));
-        assert_eq!(11, get_helper(1));
-        assert_eq!(11, get_helper2(1));
-        assert_eq!(12, get_helper2(1));
-        assert_eq!(13, get_helper2(1));
-        assert_eq!(14, get_helper2(1));
+        let src: RefT<A> = f.c_read_raw(0).expect("c_read_raw");
+        println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.as_ref());
     }
 }
