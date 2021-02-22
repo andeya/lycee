@@ -54,7 +54,7 @@ pub struct page_s {
 
 pub struct file_header_s {
     magic: u64,
-    file_size: u64,
+    pub(crate) file_size: u64,
     record_num: u64,
     total_pages: u64,
     spare_pages: u64,

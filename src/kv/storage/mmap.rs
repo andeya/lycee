@@ -1,53 +1,123 @@
 use std::{io, ptr};
 use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
+use std::io::Result;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
-use mmapio::{AsMutT, AsRefT, Mmap, MmapOptions};
+use mmapio::{AsMutT, AsRefT, MmapMut, MmapOptions};
 
 pub struct CFile(File);
 
 #[derive(Debug)]
-pub struct RefT<'a, T> {
-    t: &'a T,
-    owner: Mmap,
+pub struct MapT<T>(MmapMut, PhantomData<T>);
+
+impl<T> MapT<T> {
+    pub fn set(&mut self, src: &T) {
+        unsafe { self.0.write_t(src) }
+    }
+
+    /// Flushes outstanding memory map modifications to disk.
+    ///
+    /// When this method returns with a non-error result, all outstanding changes to a file-backed
+    /// memory map are guaranteed to be durably stored. The file's metadata (including last
+    /// modification timestamp) may not be updated.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::fs::OpenOptions;
+    /// use std::io::Write;
+    /// use std::path::PathBuf;
+    ///
+    /// use mmapio::MmapMut;
+    ///
+    /// # fn main() -> std::io::Result<()> {
+    /// # let tempdir = tempdir::TempDir::new("mmap")?;
+    /// let path: PathBuf = /* path to file */
+    /// #   tempdir.path().join("flush");
+    /// let file = OpenOptions::new().read(true).write(true).create(true).open(&path)?;
+    /// file.set_len(128)?;
+    ///
+    /// let mut mmap = unsafe { MmapMut::map_mut(&file)? };
+    ///
+    /// (&mut mmap[..]).write_all(b"Hello, world!")?;
+    /// mmap.flush()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn flush(&self) -> Result<()> {
+        self.0.flush()
+    }
+
+    /// Asynchronously flushes outstanding memory map modifications to disk.
+    ///
+    /// This method initiates flushing modified pages to durable storage, but it will not wait for
+    /// the operation to complete before returning. The file's metadata (including last
+    /// modification timestamp) may not be updated.
+    pub fn flush_async(&self) -> Result<()> {
+        self.0.flush_async()
+    }
+
+    /// Flushes outstanding memory map modifications in the range to disk.
+    ///
+    /// The offset and length must be in the bounds of the memory map.
+    ///
+    /// When this method returns with a non-error result, all outstanding changes to a file-backed
+    /// memory in the range are guaranteed to be durable stored. The file's metadata (including
+    /// last modification timestamp) may not be updated. It is not guaranteed the only the changes
+    /// in the specified range are flushed; other outstanding changes to the memory map may be
+    /// flushed as well.
+    pub fn flush_range(&self, offset: usize, len: usize) -> Result<()> {
+        self.flush_range(offset, len)
+    }
+
+    /// Asynchronously flushes outstanding memory map modifications in the range to disk.
+    ///
+    /// The offset and length must be in the bounds of the memory map.
+    ///
+    /// This method initiates flushing modified pages to durable storage, but it will not wait for
+    /// the operation to complete before returning. The file's metadata (including last
+    /// modification timestamp) may not be updated. It is not guaranteed that the only changes
+    /// flushed are those in the specified range; other outstanding changes to the memory map may
+    /// be flushed as well.
+    pub fn flush_async_range(&self, offset: usize, len: usize) -> Result<()> {
+        self.flush_async_range(offset, len)
+    }
 }
 
-impl<'a, T> AsRef<T> for RefT<'a, T> {
-    fn as_ref(&self) -> &'a T {
-        self.t
+impl<T> Deref for MapT<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.0.as_ref_t() }
+    }
+}
+
+impl<T> DerefMut for MapT<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.0.as_mut_t() }
     }
 }
 
 impl CFile {
-    pub fn open<P: AsRef<Path>>(path: P) -> io::Result<CFile> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<CFile> {
         Ok(CFile(open_file(path)?))
     }
-
-    pub fn c_write_raw<T>(&self, offset: u64, src: &T) -> io::Result<()> {
+    pub fn map_mut<T>(&self, offset: u64) -> Result<MapT<T>> {
         unsafe {
-            let mut mmap = MmapOptions::new()
-                .len(std::mem::size_of::<T>())
-                .offset(offset)
-                .map_mut(&self.0)?;
-            mmap.write_t(src);
-        }
-        Ok(())
-    }
-
-    pub fn c_read_raw<'a, T: Debug>(&self, offset: u64) -> io::Result<RefT<'a, T>> {
-        unsafe {
-            let mmap = MmapOptions::new()
-                .len(std::mem::size_of::<T>())
-                .offset(offset)
-                .map(&self.0)?;
-            Ok(RefT { t: mmap.as_ref_t::<'a, T>(), owner: mmap })
+            Ok(MapT(MmapOptions::new()
+                        .len(std::mem::size_of::<T>())
+                        .offset(offset)
+                        .map_mut(&self.0)?,
+                    PhantomData::<T>,
+            ))
         }
     }
 }
 
 
-fn open_file<P: AsRef<Path>>(path: P) -> io::Result<File> {
+fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
     OpenOptions::new()
         .read(true)
         .write(true)
@@ -71,7 +141,9 @@ mod tests {
     use std::mem;
     use std::sync::Once;
 
-    use crate::kv::storage::mmap::{CFile, RefT};
+    use mmapio::AsMutT;
+
+    use crate::kv::storage::mmap::{CFile, MapT};
 
     #[repr(C)]
     #[derive(Debug)]
@@ -85,15 +157,19 @@ mod tests {
             .expect("Unable to open file");
         let mut src = A { n: [0; 128] };
         src.n[0..4].copy_from_slice(&[2, 3, 4, 8]);
-        f.c_write_raw(0, &src).expect("c_write_raw");
-        f.0.flush();
+        let mut mmap: MapT<A> = f.map_mut(0)
+                                 .expect("write");
+        mmap.set(&src);
+        mmap.flush();
     }
 
     #[test]
     fn test_read() {
         let f = CFile::open("test.mmap")
             .expect("Unable to open file");
-        let src: RefT<A> = f.c_read_raw(0).expect("c_read_raw");
-        println!("size={}\nsrc={:?}", mem::size_of::<A>(), src.as_ref());
+        let mut a: &mut A = &mut f.map_mut(0)
+                                  .expect("read");
+        a.n[0] = 12;
+        println!("size={}\nsrc={:?}", mem::size_of::<A>(), a);
     }
 }
