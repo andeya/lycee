@@ -1,7 +1,8 @@
 use std::{io, ptr};
+use std::default::Default;
 use std::fmt::Debug;
-use std::fs::{File, OpenOptions};
-use std::io::Result;
+use std::fs::{File, Metadata, OpenOptions};
+use std::io::{Result, Seek};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
@@ -10,14 +11,55 @@ use mmapio::{AsMutT, AsRefT, MmapMut, MmapOptions};
 
 pub struct CFile(File);
 
+
+impl CFile {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<CFile> {
+        Ok(CFile(OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)?))
+    }
+    pub fn metadata(&self) -> Result<Metadata> {
+        self.0.metadata()
+    }
+    pub fn map_mut<T>(&self, offset: u64) -> Result<MapT<T>> {
+        unsafe {
+            MapT::<T>::new(&self.0, offset)
+        }
+    }
+}
+
+
+fn copy_nonoverlapping<S, D>(src: *const S, dst: *mut D) {
+    unsafe { ptr::copy_nonoverlapping(src as *const u8, dst as *mut u8, std::mem::size_of::<S>()); }
+}
+
+fn transmute_ref<'a, P, T>(p: *const P) -> &'a T {
+    unsafe { &*(p as *const T) }
+}
+
 #[derive(Debug)]
 pub struct MapT<T>(MmapMut, PhantomData<T>);
+
+impl<T> Default for MapT<T> {
+    fn default() -> MapT<T> {
+        MapT(MmapMut::default(), PhantomData)
+    }
+}
 
 impl<T> MapT<T> {
     pub fn set(&mut self, src: &T) {
         unsafe { self.0.write_t(src) }
     }
-
+    pub unsafe fn new(file: &File, offset: u64) -> Result<MapT<T>> {
+        Ok(MapT(MmapOptions::new()
+                    .len(std::mem::size_of::<T>())
+                    .offset(offset)
+                    .map_mut(file)?,
+                PhantomData::<T>,
+        ))
+    }
     /// Flushes outstanding memory map modifications to disk.
     ///
     /// When this method returns with a non-error result, all outstanding changes to a file-backed
@@ -98,40 +140,6 @@ impl<T> DerefMut for MapT<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut_t() }
     }
-}
-
-impl CFile {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<CFile> {
-        Ok(CFile(open_file(path)?))
-    }
-    pub fn map_mut<T>(&self, offset: u64) -> Result<MapT<T>> {
-        unsafe {
-            Ok(MapT(MmapOptions::new()
-                        .len(std::mem::size_of::<T>())
-                        .offset(offset)
-                        .map_mut(&self.0)?,
-                    PhantomData::<T>,
-            ))
-        }
-    }
-}
-
-
-fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
-    OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(path)
-}
-
-pub fn copy_nonoverlapping<S, D>(src: *const S, dst: *mut D) {
-    unsafe { ptr::copy_nonoverlapping(src as *const u8, dst as *mut u8, std::mem::size_of::<S>()); }
-}
-
-
-pub fn transmute_ref<'a, P, T>(p: *const P) -> &'a T {
-    unsafe { &*(p as *const T) }
 }
 
 #[cfg(test)]

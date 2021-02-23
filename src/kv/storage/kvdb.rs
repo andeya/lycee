@@ -8,6 +8,6 @@ use crate::kv::storage::mmap::CFile;
 pub struct kvdb_s {
     pub file: CFile,
     pub(crate) h: Box<file_header_s>,
-    pub alc: Box<allocator_s>,
+    pub alc: Option<allocator_s>,
     ch: Box<cache_s>,
 }
