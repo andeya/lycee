@@ -32,7 +32,7 @@ fn _pl() {
 // global page id
 pub type gpid_t = usize;
 
-const GPID_NIL: gpid_t = gpid_t::MAX;
+pub const GPID_NIL: gpid_t = gpid_t::MAX;
 
 struct record_s {
     k: usize,
@@ -53,14 +53,14 @@ pub struct page_s {
 }
 
 pub struct file_header_s {
-    magic: usize,
+    pub(crate) magic: &'static str,
     pub(crate) file_size: u64,
-    record_num: usize,
-    total_pages: usize,
-    spare_pages: usize,
-    level: u32,
+    pub(crate) record_num: usize,
+    pub(crate) total_pages: usize,
+    pub(crate) spare_pages: usize,
+    pub(crate) level: u32,
     reserve: u32,
-    root_gpid: gpid_t,
+    pub(crate) root_gpid: gpid_t,
 }
 
 pub struct page_bitmap_s {
@@ -73,16 +73,29 @@ pub struct busy_page_num_s {
 }
 
 
-struct pg_s;
-
-type pg_t = Box<pg_s>;
-
-
-// pub type kvdb_t = &mut kvdb_s;
-
-struct cursor_s {
+pub struct pg_s {
+    // off:0
+    flags: u32,
+    reserv: u32,
+    // off:8
     gpid: gpid_t,
-    pg: pg_t,
+    // off:16
+    buf: Box<page_s>,
+    // for hash, off:24
+    hash: node_s,
+    // for lru, off:40
+    link: node_s,
+}
+
+pub struct node_s {
+    prev: Box<node_s>,
+    next: Box<node_s>,
+}
+
+
+pub struct cursor_s {
+    gpid: gpid_t,
+    pg: Box<pg_s>,
     p: Box<page_s>,
     pos: i64,
     start_key: usize,

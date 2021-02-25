@@ -1,4 +1,7 @@
-use crate::kv::storage::inner::{gpid_t, page_s, PAGE_SIZE};
+use std::io::Result;
+
+use crate::kv::storage::inner::{gpid_t, node_s, page_s, PAGE_SIZE};
+use crate::kv::storage::kvdb::kvdb_s;
 
 // 1MB for test
 const MAX_CACHE_SIZE: usize = 1 << 20;
@@ -11,24 +14,6 @@ const PAGE_HASH_MASK: usize = MAX_MAPPED_PG - 1;
 const PG_DIRTY: usize = 1 << 0;
 const PG_BUSY: usize = 1 << 1;
 
-struct node_s {
-    prev: Box<node_s>,
-    next: Box<node_s>,
-}
-
-struct pg_s {
-    // off:0
-    flags: u32,
-    reserv: u32,
-    // off:8
-    gpid: gpid_t,
-    // off:16
-    buf: Box<page_s>,
-    // for hash, off:24
-    hash: node_s,
-    // for lru, off:40
-    link: node_s,
-}
 
 pub struct cache_s {
     mapped_num: usize,
@@ -39,4 +24,10 @@ pub struct cache_s {
     free: node_s,
     // busy list head
     busy: node_s,
+}
+
+impl kvdb_s {
+    pub fn init_cache(&mut self) -> Result<()> {
+        Ok(())
+    }
 }

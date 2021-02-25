@@ -1,3 +1,5 @@
+use std::mem;
+
 const CRC64_TAB: [u64; 256] = [
     0x0000000000000000, 0x7ad870c830358979, 0xf5b0e190606b12f2,
     0x8f689158505e9b8b, 0xc038e5739841b68f, 0xbae095bba8743ff6,
@@ -87,7 +89,7 @@ const CRC64_TAB: [u64; 256] = [
     0x29b7d047efec8728
 ];
 
-pub fn kv_crc64(buffer: &Vec<u8>) -> u64 {
+pub fn kv_crc64(buffer: &[u8]) -> u64 {
     let mut crc: u64 = 0;
     for x in buffer {
         crc = CRC64_TAB[((crc ^ x.clone() as u64) & 0xff) as usize] ^ (crc >> 8);
@@ -95,3 +97,6 @@ pub fn kv_crc64(buffer: &Vec<u8>) -> u64 {
     return crc;
 }
 
+pub fn as_ne_bytes<T: Sized>(u: &T) -> &'static [u8] {
+    unsafe { &*(u as *const T as *const &[u8]) }
+}

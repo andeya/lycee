@@ -17,7 +17,7 @@ pub struct allocator_s {
 }
 
 impl kvdb_s {
-    fn init_allocator(&mut self) -> Result<()> {
+    pub fn init_allocator(&mut self) -> Result<()> {
         let mut ck: ckid_t = 0;
         /*
         * if the file size smaller than the area of busy page number, the file is
@@ -98,7 +98,7 @@ impl kvdb_s {
         Ok(())
     }
 
-    fn exit_allocator(&mut self) -> Result<()> {
+    pub fn exit_allocator(&mut self) -> Result<()> {
         self.sync_allocator()?;
         // munmap
         self.alc = None;

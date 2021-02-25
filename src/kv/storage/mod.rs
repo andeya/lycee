@@ -9,6 +9,7 @@ mod allocator;
 mod cache;
 mod crc64;
 mod mmap;
+mod cmd;
 
 /// Storage represents the internal-facing server part of TinyKV, it handles sending and receiving from other
 /// TinyKV nodes. As part of that responsibility, it also reads and writes data to disk (or semi-permanent memory).
@@ -40,4 +41,12 @@ trait DBItem {
     /// If nil is passed, or capacity of dst isn't sufficient, a new slice would be allocated and
     /// returned.
     fn value_copy(&self, dst: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>>;
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn is_it_work() {
+        assert_eq!(1 + 2, 3);
+    }
 }
