@@ -19,10 +19,10 @@ const FOUND_EXACT: i8 = 6;
 const FOUND_GREATER: i8 = 7;
 
 pub struct kvdb_s {
-    pub file: CFile,
     pub(crate) h: MapT<file_header_s>,
     pub alc: Option<allocator_s>,
     ch: Option<Box<cache_s>>,
+    pub file: CFile,
 }
 
 impl kvdb_s {
@@ -78,6 +78,7 @@ impl kvdb_s {
     }
 }
 
+
 impl Iterator for cursor_s {
     type Item = (u64, u64);
 
@@ -85,3 +86,4 @@ impl Iterator for cursor_s {
         unimplemented!()
     }
 }
+

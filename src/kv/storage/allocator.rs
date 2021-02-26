@@ -90,22 +90,6 @@ impl kvdb_s {
     }
 
 
-    fn sync_allocator(&mut self) -> Result<()> {
-        if let Some(ref alc) = self.alc {
-            alc.pb.flush()?;
-            alc.bpn.flush()?;
-        }
-        Ok(())
-    }
-
-    pub fn exit_allocator(&mut self) -> Result<()> {
-        self.sync_allocator()?;
-        // munmap
-        self.alc = None;
-        Ok(())
-    }
-
-
     fn get_gpid(ck: ckid_t, lpid: lpid_t) -> gpid_t {
         (ck as gpid_t) * PAGE_NUM_PER_CK + lpid as usize
     }
@@ -120,5 +104,4 @@ impl kvdb_s {
         return pos;
     }
 }
-
 

@@ -138,19 +138,18 @@ fn exec(args: Vec<String>) -> Result<()> {
         usage();
         return Ok(());
     }
-    let kv = kvdb_s::open("aaa.db")?;
+    let mut db = kvdb_s::open("aaa.db")?;
+    let mut found = false;
+    for c in &cmds {
+        if c.cmd == args[1] {
+            (c.func)(&mut db, args);
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        usage();
+    }
     return Ok(());
-
-// for (c=cmds; c->cmd!=NULL; c++) {
-// if (strcmp(c->cmd, argv[1])==0) {
-// c->func(kv, argc, argv);
-// break;
-// }
-// }
-// if (c->cmd==NULL) {
-// usage();
-// }
-// kvdb_close(kv);
-// return 0;
 }
 

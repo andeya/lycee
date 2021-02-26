@@ -48,6 +48,12 @@ impl<T> Default for MapT<T> {
     }
 }
 
+impl<T> Drop for MapT<T> {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+
 impl<T> MapT<T> {
     pub fn set(&mut self, src: &T) {
         unsafe { self.0.write_t(src) }
