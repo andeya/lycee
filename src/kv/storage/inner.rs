@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::mem;
+use std::rc::Rc;
 
 use crate::{catch_backtrace, catch_symbol};
 
@@ -87,11 +89,13 @@ pub struct pg_s {
     link: node_s,
 }
 
+#[derive(Debug, Default)]
 pub struct node_s {
-    prev: Box<node_s>,
-    next: Box<node_s>,
+    pub prev: OptionNode,
+    pub next: OptionNode,
 }
 
+pub type OptionNode = Option<Rc<RefCell<node_s>>>;
 
 pub struct cursor_s {
     gpid: gpid_t,

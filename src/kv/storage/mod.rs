@@ -6,6 +6,7 @@ mod modify;
 mod kvdb;
 pub mod inner;
 mod allocator;
+#[macro_use]
 mod cache;
 mod crc64;
 mod mmap;
@@ -45,8 +46,23 @@ trait DBItem {
 
 #[cfg(test)]
 mod tests {
+    use crate::kv::storage::cache::cache_s;
+    use crate::kv::storage::inner::node_s;
+
     #[test]
     fn is_it_work() {
         assert_eq!(1 + 2, 3);
+    }
+
+    #[test]
+    fn test_cache_s_new() {
+        let cache = cache_s::new();
+        for (i, emem) in cache.hash.iter().enumerate() {
+            println!("cache.hash {}:{:?}", i, emem);
+        }
+        let nodes = array_init!(node_s { prev: None, next: None }; 10);
+        for (i, emem) in (&nodes).iter().enumerate() {
+            println!("nodes {}:{:?}", i, emem);
+        }
     }
 }

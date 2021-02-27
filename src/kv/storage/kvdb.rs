@@ -21,7 +21,7 @@ const FOUND_GREATER: i8 = 7;
 pub struct kvdb_s {
     pub(crate) h: MapT<file_header_s>,
     pub alc: Option<allocator_s>,
-    ch: Option<Box<cache_s>>,
+    ch: cache_s,
     pub file: CFile,
 }
 
@@ -45,10 +45,9 @@ impl kvdb_s {
             file,
             h,
             alc: None,
-            ch: None,
+            ch: cache_s::new(),
         };
         db.init_allocator();
-        db.init_cache();
         return Ok(db);
     }
     pub fn get(&mut self, k: u64) -> Result<u64> {

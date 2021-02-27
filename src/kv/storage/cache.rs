@@ -1,6 +1,10 @@
+use std::cell::RefCell;
 use std::io::Result;
+use std::mem;
+use std::ptr;
+use std::rc::Rc;
 
-use crate::kv::storage::inner::{gpid_t, node_s, page_s, PAGE_SIZE};
+use crate::kv::storage::inner::{gpid_t, node_s, OptionNode, page_s, PAGE_SIZE};
 use crate::kv::storage::kvdb::kvdb_s;
 
 // 1MB for test
@@ -19,15 +23,25 @@ pub struct cache_s {
     mapped_num: usize,
     busy_num: usize,
     free_num: usize,
-    hash: [node_s; PAGE_HASH_NUM as usize],
+    pub hash: Box<[node_s; PAGE_HASH_NUM as usize]>,
     // free list head
-    free: node_s,
+    free: OptionNode,
     // busy list head
-    busy: node_s,
+    busy: OptionNode,
 }
 
-impl kvdb_s {
-    pub fn init_cache(&mut self) -> Result<()> {
-        Ok(())
+
+impl cache_s {
+    pub fn new() -> cache_s {
+        let c = cache_s {
+            mapped_num: 0,
+            busy_num: 0,
+            free_num: 0,
+            hash: Box::new(array_init!(node_s { prev: None, next: None }; PAGE_HASH_NUM)),
+            free: None,
+            busy: None,
+        };
+        c
     }
 }
+
