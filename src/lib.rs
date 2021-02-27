@@ -6,7 +6,7 @@ use std::path::Path;
 use backtrace::{Backtrace, BacktraceSymbol, SymbolName};
 
 macro_rules! array_init {
-    ($default:expr;$usize:expr)=>{
+    ($default:expr; $usize:expr)=>{
    unsafe {
             let mut array: [_; $usize] = std::mem::MaybeUninit::uninit().assume_init();
             for elem in array.iter_mut() {
