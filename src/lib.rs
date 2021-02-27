@@ -190,3 +190,22 @@ pub fn innermost_symbol(b: &Backtrace) -> TraceSymbol {
 pub fn catch_symbol(skip: usize) -> TraceSymbol {
     innermost_symbol(&catch_backtrace(skip, 1))
 }
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn is_it_work() {
+        assert_eq!(1 + 2, 3);
+    }
+
+    #[test]
+    fn test_array_init() {
+        #[derive(Debug)]
+        struct S();
+        let ss: [Option<S>; 10] = array_init![None; 10];
+        for (i, emem) in ss.iter().enumerate() {
+            println!("nodes {}:{:?}", i, emem);
+        }
+    }
+}
