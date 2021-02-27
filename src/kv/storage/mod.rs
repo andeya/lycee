@@ -61,7 +61,7 @@ mod tests {
             println!("cache.hash {}:{:?}", i, emem);
         }
         let nodes = array_init!(node_s { prev: None, next: None };10);
-        for (i, emem) in (&nodes).iter().enumerate() {
+        for (i, emem) in nodes.iter().enumerate() {
             println!("nodes {}:{:?}", i, emem);
         }
     }
