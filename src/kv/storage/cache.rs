@@ -37,7 +37,7 @@ impl cache_s {
             mapped_num: 0,
             busy_num: 0,
             free_num: 0,
-            hash: Box::new(array_init!(node_s { prev: None, next: None }; PAGE_HASH_NUM)),
+            hash: Box::new(array_init![node_s { prev: None, next: None }; PAGE_HASH_NUM]),
             free: None,
             busy: None,
         };
