@@ -1,10 +1,12 @@
+use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
+use std::collections::LinkedList;
 use std::io::Result;
 use std::mem;
 use std::ptr;
 use std::rc::Rc;
 
-use crate::kv::storage::inner::{gpid_t, node_s, OptionNode, page_s, PAGE_SIZE};
+use crate::kv::storage::inner::{gpid_t, Node, page_s, PAGE_SIZE};
 use crate::kv::storage::kvdb::kvdb_s;
 
 // 1MB for test
@@ -23,25 +25,45 @@ pub struct cache_s {
     mapped_num: usize,
     busy_num: usize,
     free_num: usize,
-    pub hash: Box<[node_s; PAGE_HASH_NUM as usize]>,
+    pub hash: Box<[Node; PAGE_HASH_NUM as usize]>,
     // free list head
-    free: OptionNode,
+    free: Option<Node>,
     // busy list head
-    busy: OptionNode,
+    busy: Option<Node>,
 }
 
 
 impl cache_s {
     pub fn new() -> cache_s {
+        const node: Node = Node::new();
         let c = cache_s {
             mapped_num: 0,
             busy_num: 0,
             free_num: 0,
-            hash: Box::new(array_init![node_s { prev: None, next: None }; PAGE_HASH_NUM]),
+            hash: Box::new([node; PAGE_HASH_NUM]),
             free: None,
             busy: None,
         };
         c
     }
+    // fn list_add(h: &mut RcNode, mut n: ListNode) {
+    //     let third = (&**h).borrow().next.clone();
+    //     n.next = third.clone();
+    //     n.prev = Some(Rc::clone(h));
+    //     let mut n = Rc::new(RefCell::new(n));
+    //     (&**h).borrow_mut().next = Some(Rc::clone(&n));
+    //     if let Some(ref node) = third {
+    //         (&**node).borrow_mut().prev = Some(n);
+    //     }
+
+    // golang:
+    // third := h.next;
+    // n.next = third;
+    // n.prev = h;
+    // h.next = n;
+    // if third.prev != nil {
+    //  third.prev = n;
+    // }
+    // }
 }
 

@@ -47,7 +47,7 @@ trait DBItem {
 #[cfg(test)]
 mod tests {
     use crate::kv::storage::cache::cache_s;
-    use crate::kv::storage::inner::node_s;
+    use crate::kv::storage::inner::Node;
 
     #[test]
     fn is_it_work() {

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::mem;
-use std::rc::Rc;
+use std::ptr;
+use std::ptr::NonNull;
 
 use crate::{catch_backtrace, catch_symbol};
 
@@ -36,6 +37,7 @@ pub type gpid_t = usize;
 
 pub const GPID_NIL: gpid_t = gpid_t::MAX;
 
+#[derive(Debug, PartialEq)]
 struct record_s {
     k: usize,
     v: usize,
@@ -43,12 +45,14 @@ struct record_s {
 
 const PAGE_LEAF: usize = 1 << 0;
 
+#[derive(Debug, PartialEq)]
 struct page_header_s {
     record_num: i32,
     flags: u32,
     next: gpid_t,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct page_s {
     h: page_header_s,
     rec: [record_s; RECORD_NUM_PG],
@@ -74,28 +78,57 @@ pub struct busy_page_num_s {
     pub(crate) n: [usize; MAX_CHUNK_NUM],
 }
 
-
+#[derive(Debug, PartialEq)]
 pub struct pg_s {
-    // off:0
     flags: u32,
     reserv: u32,
-    // off:8
     gpid: gpid_t,
-    // off:16
-    buf: Box<page_s>,
-    // for hash, off:24
-    hash: node_s,
-    // for lru, off:40
-    link: node_s,
+    buf: Option<page_s>,
+    hash: Node,
+    link: Node,
 }
 
-#[derive(Debug, Default)]
-pub struct node_s {
-    pub prev: OptionNode,
-    pub next: OptionNode,
+#[derive(Debug, PartialEq)]
+pub struct Node {
+    next: Option<NonNull<Node>>,
+    prev: Option<NonNull<Node>>,
 }
 
-pub type OptionNode = Option<Rc<RefCell<node_s>>>;
+impl Node {
+    pub(crate) const fn new() -> Node {
+        Node { next: None, prev: None }
+    }
+}
+
+const _PG: &pg_s = &pg_s::new();
+
+impl pg_s {
+    const fn new() -> pg_s {
+        const r: record_s = record_s { k: 0, v: 0 };
+        pg_s {
+            flags: 0,
+            reserv: 0,
+            gpid: 0,
+            buf: None,
+            hash: Node::new(),
+            link: Node::new(),
+        }
+    }
+    pub fn from_hash(hash: &Node) -> &mut pg_s {
+        unsafe {
+            let PG_HASH_OFFSET = (&_PG.hash as *const Node as usize) - (_PG as *const pg_s as usize);// 16
+            println!("PG_HASH_OFFSET={}", PG_HASH_OFFSET);
+            &mut *((hash as *const Node as usize - PG_HASH_OFFSET) as *mut pg_s)
+        }
+    }
+    pub fn from_link(link: &Node) -> &mut pg_s {
+        unsafe {
+            let PG_LINK_OFFSET = (&_PG.link as *const Node as usize) - (_PG as *const pg_s as usize);// 32
+            println!("PG_LINK_OFFSET={}", PG_LINK_OFFSET);
+            &mut *((link as *const Node as usize - PG_LINK_OFFSET) as *mut pg_s)
+        }
+    }
+}
 
 pub struct cursor_s {
     gpid: gpid_t,
@@ -104,4 +137,22 @@ pub struct cursor_s {
     pos: i64,
     start_key: usize,
     end_key: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::kv::storage::inner::pg_s;
+
+    #[test]
+    fn to_pg() {
+        let pg = &mut pg_s::new();
+        pg.flags = 101;
+        let pg2 = pg_s::from_hash(&pg.hash);
+        assert_eq!(101, pg2.flags);
+        assert_eq!(pg, pg2);
+        pg.flags = 202;
+        let pg3 = pg_s::from_link(&pg.link);
+        assert_eq!(202, pg3.flags);
+        assert_eq!(pg, pg3);
+    }
 }
